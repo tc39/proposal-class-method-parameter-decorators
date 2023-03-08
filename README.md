@@ -40,7 +40,7 @@ or to alter behavior:
 
 ```js
 class UserManager {
-  createUser(@NotEmpty username, @NotEmpty password, @ValidateEmail emailAddress, @Minimum(0) age) { ... }
+  createUser(@NotEmpty username, @NotEmpty password, @ValidateEmail emailAddress, @MinValue(0) age) { }
 }
 ```
 
@@ -52,7 +52,7 @@ a parameter visually based solely on ordinal position:
 ```diff js
   class UserManager {
     @param(3, ValidateEmail)
-    @param(2, Minimum(0))
+    @param(2, MinValue(0))
     @param(1, NotEmpty)
     @param(0, NotEmpty)
 --  createUser(username, password, age, emailAddress) { ... }
