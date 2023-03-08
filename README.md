@@ -254,6 +254,8 @@ type ParameterDecoratorContext = {
   function: {
     kind: "class" | "method" | "setter";
     name: string | symbol | undefined;
+    static?: boolean;
+    private?: boolean;
   };
   metadata: object;
   addInitializer(initializer: () => void): void;
