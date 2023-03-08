@@ -203,7 +203,7 @@ For example, given the source
 ```js
 @A
 @B
-class C {
+class Cls {
   @C
   @D
   method(@E @F param1, @G @H param2) { }
@@ -224,7 +224,7 @@ For example, given the source
 ```js
 @A
 @B
-class C {
+class Cls {
   @C
   @D
   method(@E @F param1, @G @H param2) { }
@@ -236,7 +236,7 @@ decorators would be _applied_ in the following order:
 - `F`, `E` of `param1`
 - `H`, `G` of `param2`
 - `D`, `C` of `method`
-- `B`, `A` of `class C`
+- `B`, `A` of `class Cls`
 
 ## Anatomy of a Parameter Decorator
 
