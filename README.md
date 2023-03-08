@@ -1,6 +1,7 @@
 # ECMAScript Decorators for Class Method and Constructor Parameters
 
-This proposal adds support for decorators on the parameters of class constructors and class methods.
+This proposal adds support for [decorators](https://github.com/tc39/proposal-decorators) on the parameters of class
+constructors and class methods.
 
 ## Status
 
@@ -27,7 +28,7 @@ methods, and are intended to support a number of use cases including:
 - Constructor parameter-based *Dependency Injection* (DI).
 - Object-relational mapping (ORM) entity construction that couples with private fields.
 - Method parameter marshaling for Foreign Function Interfaces (FFI).
-- Metadata for Parameters (when paired with https://github.com/tc39/proposal-decorator-metadata).
+- [Metadata](https://github.com/tc39/proposal-decorator-metadata) for Parameters.
 - Routing: bind HTTP request headers/querystring parameters/post body fields/etc. to parameters.
 - Argument validation: disallow `null`/`undefined`, range validation, regexp string validation, etc.
 
@@ -125,9 +126,9 @@ function LPWStr(target, context) {
 
 # Prior Art
 
-- TypeScript: Legacy (experimental) Decorators
-- C#: Parameter attributes
-- Java: Parameter annotations
+- TypeScript: [Legacy (experimental) Decorators](https://www.typescriptlang.org/docs/handbook/decorators.html)
+- C#: [Attributes](https://learn.microsoft.com/en-us/dotnet/csharp/programming-guide/concepts/attributes/)
+- Java: [Annotations](https://docs.oracle.com/javase/tutorial/java/annotations/basics.html)
 
 # Syntax
 
@@ -705,6 +706,10 @@ export class Messages implements AfterContentInit, OnDestroy {
 
 plus [8 others...](https://sourcegraph.com/search?q=context:global+repo:%5Egithub%5C.com/primefaces/primeng%24++lang:typescript+constructor%28%40:%5Bid%5D...%29&patternType=structural&sm=1&groupBy=repo)
 
+# Related Proposals
+
+- [Decorators](https://github.com/tc39/proposal-decorators) (Stage 3)
+- [Decorator Metadata](https://github.com/tc39/proposal-decorator-metadata) (Stage 2)
 
 # TODO
 
