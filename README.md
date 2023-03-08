@@ -46,7 +46,7 @@ class UserManager {
 
 While its feasible to do the same with regular method decorators, you are only really able to associate such a
 decoration via a parameter's ordinal position. It becomes much harder to maintain them over time as parameters are
-added, removed, or reordered, as well as far more difficult to read and review when you must relate a decorator and 
+added, removed, or reordered, as well as far more difficult to read and review when you must relate a decorator and
 a parameter visually based solely on ordinal position:
 
 ```diff js
@@ -84,7 +84,7 @@ class BookApi {
 ```
 
 Parameter decorators might also provide a useful avenue for data validation and transformation by providing a mechanism
-to observe and potentially replace an incoming argument, similar to how a field decorator allows you to observe and 
+to observe and potentially replace an incoming argument, similar to how a field decorator allows you to observe and
 potentially replace an initializer:
 
 ```js
@@ -300,7 +300,411 @@ class C {
 
 # Examples
 
-TBD
+## ECMAScript
+
+### Dependency Injection (DI)
+
+Dependency Injection systems often use constructor parameter injection to satisfy dependencies when an instance of
+a component is requested. This allows such a component to perform additional initialization logic and set private
+fields:
+
+**customizationService.js**
+```js
+import { inject } from "di-framework"
+
+class CustomizationService {
+  #storageService;
+  #authorizationService;
+  constructor(
+    @inject("StorageService") storageService,
+    @inject("AuthorizationService") authorizationService
+  ) {
+    storageService.ensurePerUserStorage();
+    this.#storageService = storageService;
+    this.#authorizationService = authorizationService;
+  }
+
+  setTheme(userId, theme) {
+    if (!this.#authorizationService.currentUserHasPermission(userId, ["CHANGE_PROFILE"])) {
+      throw new Error()
+    }
+    this.#storageServce.writeProperty(`${userId}/profile/theme`, theme);
+  }
+}
+```
+
+Composition allows you to easily stitch together a complex application with many disparate parts, as well as
+customize per-environment dependencies:
+
+**main.js**
+```js
+import { Container } from "di-framework"
+import { FileSystemStorageService } from "./fileSystemStorageService.js"
+import { CloudStorageService } from "./cloudStorageService.js"
+import { AuthorizationService } from "./authorizationService.js"
+import { CustomizationService } from "./customizationService.js"
+import { HttpService } from "./httpService.js"
+import { Application } from "./app.js"
+
+export function main(useCloudStorage) {
+  const container = new Container()
+  container.set("StorageService", useCloudStorage ? CloudStorageService : FileSystemStorageService)
+  container.set("AuthorizationService", AuthorizationService)
+  container.set("CustomizationService", CustomizationService)
+
+  ...
+
+  const customizationService = container.get("CustomizationService")
+  customizationService.setTheme(userId, theme)
+}
+```
+
+One of the advantages of constructor parameter injection is that it makes it fairly easy to test a component or service
+in isolation through the use of mock or fake implementations of dependencies:
+
+**customizationService.tests.js**
+```js
+import { CustomizationService } from "./customizationService.js"
+
+describe("CustomizationService tests", () => {
+  it("throws when access invalid", () => {
+    const fakeStorageService = { ensurePerUserStorage() {} };
+    const fakeAuthorizationService = { currentUserHasPermission: (userId, permissions) => false };
+    const customizationService = new CustomizationService(fakeStorageService, fakeAuthorizationService);
+    expect(() => customizationService.setTheme(1234, "dark")).toThrow();
+  })
+});
+```
+
+### Object-Relational Mapping (ORM)
+
+Many ORM systems leverage user-defined classes to model an entity:
+
+```js
+@Entity()
+export class User {
+  @Field({ type: "string" })
+  id;
+  @Field({ type: "string" })
+  email;
+  @Field({ type: "byte(16)" })
+  passwordHash;
+  @Field({ type: "string" })
+  fullName;
+
+  constructor(id, passwordHash, email, fullName) {
+    this.id = id;
+    this.passwordHash = passwordHas;
+    this.email = email;
+    this.fullName = fullName;
+  }
+}
+```
+
+However, they often do so by ignoring the constructor and using `Object.create()`. This makes rehydrating an entity
+difficult when that entity might have private class elements:
+
+```js
+@Entity()
+export class User {
+  @Field({ type: "string" })
+  id;
+  @Field({ type: "string" })
+  email;
+  @Field({ type: "byte(16)" })
+  #passwordHash; // cannot use Object.create
+  @Field({ type: "string" })
+  fullName;
+
+  constructor(id, password, email, fullName) {
+    this.id = id;
+    this.passwordHash = password;
+    this.email = email;
+    this.fullName = fullName;
+  }
+}
+```
+
+If the entity has a private field, the ORM can no longer rehydrate it without calling the constructor, and needs a
+mechanism to associate a database record field with the associated parameter. Today, ORMs often handle this by just
+passing in an object containing key/value mappings for the record, but that can often result in the need to overload the
+constructor to handle both ORM construction and a constructor designed for ease of use by users.
+
+To make this easier, constructor parameters could be used to signal to the ORM system which fields should be supplied
+for which parameters, and in what order:
+
+```js
+@Entity({ constructable: true })
+export class User {
+  @Field({ type: "string" })
+  id;
+  @Field({ type: "string" })
+  email;
+  @Field({ type: "byte(16)" })
+  #passwordHash; // cannot use Object.create
+  @Field({ type: "string" })
+  fullName;
+  @Field({ type: "timestamp" })
+  #createdOn;
+
+  constructor(
+    @Field() id,
+    @Field({ name: "passwordHash" }) password,
+    @Field() email,
+    @Field() fullName,
+    @Field() createdOn = new Date()
+  ) {
+    this.id = id;
+    this.passwordHash = password;
+    this.email = email;
+    this.fullName = fullName;
+    this.#createdOn = createdOn;
+  }
+}
+```
+
+### Foreign Function Interfaces
+
+Packages like [`ffi-napi`](https://www.npmjs.com/package/ffi-napi) can be used to call into native code from NodeJS.
+Passing ECMAScript callbacks to native code requires, marshalling parameters and return values to and from native
+formats:
+```js
+// Interface into the native lib
+let libname = ffi.Library('./libname', {
+  'setCallback': ['void', ['pointer']]
+});
+
+// Callback from the native lib back into js
+let callback = ffi.Callback('void', ['int', 'string'],
+  function(id, name) {
+    console.log("id: ", id);
+    console.log("name: ", name);
+  });
+
+libname.setCallback(callback);
+```
+
+With parameter decorators, we could easily annotate marshalling behavior on the parameter itself:
+
+```js
+class MyClass {
+
+  @MarshalReturnAs("void")
+  static callback(
+    @MarshalAs("int") id,
+    @MarshalAs("string") name
+  ) {
+    console.log("id: ", id);
+    console.log("name: ", name);
+  }
+
+  static {
+    let libname = ffi.Library('./libname', {
+      'setCallback': ['void', ['pointer']]
+    });
+    libname.setCallback(this.callback);
+  }
+}
+```
+
+### HTTP Routing
+
+Class methods are a great parallel to web API routes in a REST web service. Method parameter decorators could facilitate
+how route parameters, querystring values, POST bodies, and form fields are mapped to parameters:
+
+```js
+export class BookApi {
+  // examples:
+  //  GET /books
+  //  GET /books?p=2
+  //  GET /books?p=3&ps=25
+  @Get("/books")
+  getBooks(@FromQuery("p") page = 1, @FromQuery("ps") pageSize = 10) {
+    ...
+  }
+
+  // examples:
+  //  GET /book/123-4567890123
+  @Get("/book/:isbn")
+  getBook(@FromRoute isbn) {
+    ...
+  }
+
+  @Post("/book/:isbn/review", { form: true })
+  postReviewForm(@FromRoute isbn, @FromSession user, @FromForm subject, @FromForm description, @FromForm score) { }
+
+  @Post("/book/:isbn/review", { json: true })
+  postReviewJson(@FromRoute isbn, @FromSession user, @FromBody { subject, description, score }) { }
+}
+```
+
+### Parameter Validation
+
+Parameter validators allow you to validate constructor and method inputs concisely:
+
+```js
+export class UserManager {
+  createUser(
+    @NotEmpty() username,
+    @NotEmpty() password,
+    @EmailValidator() email,
+    @NotEmpty() fullName,
+    @MinValue(13) age
+  ) {
+    ...
+  }
+}
+
+const mgr = new UserManager();
+mgr.createUser("", "", "invalid#email", "", 0) // throws
+```
+
+## In-the-wild Examples From TypeScript
+
+There are [thousands of instances](https://sourcegraph.com/search?q=context:global+lang:typescript+:%5B%5B_%5D%5D%28%40:%5B%5B_%5D%5D...%29+OR+:%5B%5B_%5D%5D%28...%2C+%40:%5B%5B_%5D%5D...%29&patternType=structural&sm=1&groupBy=repo)
+of constructor and method parameter decorators on GitHub. The following are a handful of examples from popular
+mainstream libraries.
+
+### NestJS
+
+- NPM: [`@nestjs/common`](https://www.npmjs.com/package/@nestjs/common) (2.3M+ weekly downloads)
+- GitHub: https://github.com/nestjs/nest
+- [Sourcegraph Search](https://sourcegraph.com/search?q=context:global+lang:typescript+:%5B%5B_%5D%5D%28%40:%5B%5B_%5D%5D...%29+repo:%5Egithub%5C.com/nestjs/nest%24+&patternType=structural&sm=1&groupBy=repo)
+
+NestJS uses constructor parameter decorators for dependency injection, routing, and message parameter binding:
+
+**[packages/common/pipes/parse-int.pipe.ts](https://github.com/nestjs/nest/blob/9c3f65807c6892f082593e1aac0c19a6fb63701f/packages/common/pipes/parse-int.pipe.ts#L32)**
+```ts
+import { Injectable } from '../decorators/core/injectable.decorator';
+import { Optional } from '../decorators/core/optional.decorator';
+
+...
+
+@Injectable()
+export class ParseIntPipe implements PipeTransform<string> {
+  protected exceptionFactory: (error: string) => any;
+
+  constructor(@Optional() options?: ParseIntPipeOptions) {
+    ...
+  }
+}
+```
+
+**[integration/websockets/src/app.gateway.ts](https://github.com/nestjs/nest/blob/9c3f65807c6892f082593e1aac0c19a6fb63701f/integration/websockets/src/app.gateway.ts#L10)**
+```ts
+import {
+  MessageBody,
+  SubscribeMessage,
+  WebSocketGateway,
+} from '@nestjs/websockets';
+
+@WebSocketGateway(8080)
+export class ApplicationGateway {
+  @SubscribeMessage('push')
+  onPush(@MessageBody() data) {
+    return {
+      event: 'pop',
+      data,
+    };
+  }
+}
+```
+
+**[integration/repl/src/users/users.controller.ts](https://github.com/nestjs/nest/blob/9c3f65807c6892f082593e1aac0c19a6fb63701f/integration/repl/src/users/users.controller.ts#L33-L36)**
+```ts
+...
+@Controller('users')
+export class UsersController {
+  ...
+  @Get(':id')
+  findOne(@Param('id') id: string) {
+    return this.usersService.findOne(+id);
+  }
+
+  @Patch(':id')
+  update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
+    return this.usersService.update(+id, updateUserDto);
+  }
+  ...
+}
+```
+
+plus [181 others...](https://sourcegraph.com/search?q=context:global+lang:typescript+:%5B%5B_%5D%5D%28%40:%5B%5B_%5D%5D...%29+repo:%5Egithub%5C.com/nestjs/nest%24+&patternType=structural&sm=1&groupBy=repo)
+
+### Angular
+
+- NPM: [`@angular/common`](https://www.npmjs.com/package/@angular/common) (2.7M+ weekly downloads)
+- GitHub: https://github.com/angular/angular
+- [SourceGraph Search](https://sourcegraph.com/search?q=context:global+lang:typescript+repo:%5Egithub%5C.com/angular/angular%24++constructor%28%40:%5Bid%5D...%29&patternType=structural&sm=1&groupBy=repo)
+
+Angular uses constructor parameter decorators for dependency injection, as well as HTML element [attribute binding](https://angular.io/api/core/Attribute):
+
+**[main/packages/platform-browser/src/browser.ts](https://github.com/angular/angular/blob/main/packages/platform-browser/src/browser.ts#L238)** (dependency injection)
+```ts
+...
+@NgModule({
+  providers: [
+    ...BROWSER_MODULE_PROVIDERS,  //
+    ...TESTABILITY_PROVIDERS
+  ],
+  exports: [CommonModule, ApplicationModule],
+})
+export class BrowserModule {
+  constructor(@Optional() @SkipSelf() @Inject(BROWSER_MODULE_PROVIDERS_MARKER)
+              providersAlreadyPresent: boolean|null) {
+    ...
+  }
+  ...
+}
+```
+
+**[main/packages/examples/core/ts/metadata/metadata.ts](https://github.com/angular/angular/blob/main/packages/examples/core/ts/metadata/metadata.ts#L31)** (attribute binding)
+```ts
+...
+@Directive({selector: 'input'})
+class InputAttrDirective {
+  constructor(@Attribute('type') type: string) {
+    // type would be 'text' in this example
+  }
+}
+...
+```
+
+plus [203 others...](https://sourcegraph.com/search?q=context:global+lang:typescript+repo:%5Egithub%5C.com/angular/angular%24++constructor%28%40:%5Bid%5D...%29&patternType=structural&sm=1&groupBy=repo)
+
+### PrimeNG for Angular
+
+- NPM: [`primeng`](https://www.npmjs.com/package/primeng) (300K+ weekly downloads)
+- GitHub: https://github.com/primefaces/primeng
+- [Sourcegraph Search](https://sourcegraph.com/search?q=context:global+repo:%5Egithub%5C.com/primefaces/primeng%24++lang:typescript+constructor%28%40:%5Bid%5D...%29&patternType=structural&sm=1&groupBy=repo)
+
+PrimeNG uses constructor parameter decorators as part of Angular's dependency injection system:
+
+**[src/app/components/tree/tree.ts](https://github.com/primefaces/primeng/blob/5a88fc23b752e16618fc11729e9de96478e27cde/src/app/components/tree/tree.ts#L184-L186)**
+```ts
+...
+export class UITreeNode implements OnInit {
+  ...
+  constructor(@Inject(forwardRef(() => Tree)) tree) {
+    ...
+  }
+  ...
+}
+```
+
+**[src/app/components/messages/messages.ts](https://github.com/primefaces/primeng/blob/5a88fc23b752e16618fc11729e9de96478e27cde/src/app/components/messages/messages.ts#L98)**
+```ts
+...
+export class Messages implements AfterContentInit, OnDestroy {
+  ...
+  constructor(@Optional() public messageService: MessageService, public el: ElementRef, public cd: ChangeDetectorRef) {}
+  ...
+}
+...
+```
+
+plus [8 others...](https://sourcegraph.com/search?q=context:global+repo:%5Egithub%5C.com/primefaces/primeng%24++lang:typescript+constructor%28%40:%5Bid%5D...%29&patternType=structural&sm=1&groupBy=repo)
+
 
 # TODO
 
