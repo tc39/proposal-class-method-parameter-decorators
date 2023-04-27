@@ -5,9 +5,9 @@ constructors and class methods.
 
 ## Status
 
-**Stage:** 0  \
+**Stage:** 1  \
 **Champion:** Ron Buckton (@rbuckton)  \
-**Last Presented:** (none)
+**Last Presented:** March, 2023
 
 _For more information see the [TC39 proposal process](https://tc39.es/process-document/)._
 
