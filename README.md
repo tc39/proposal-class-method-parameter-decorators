@@ -711,7 +711,7 @@ plus [8 others...](https://sourcegraph.com/search?q=context:global+repo:%5Egithu
 # Related Proposals
 
 - [Decorators](https://github.com/tc39/proposal-decorators) (Stage 3)
-- [Decorator Metadata](https://github.com/tc39/proposal-decorator-metadata) (Stage 2)
+- [Decorator Metadata](https://github.com/tc39/proposal-decorator-metadata) (Stage 3)
 
 # TODO
 
